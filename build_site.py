@@ -42,6 +42,7 @@ week = int(players.week.iloc[0])
 picks = pd.read_csv("data/picks.csv")
 edges = pd.read_csv("data/edges.csv")
 priced = edges.drop_duplicates(["player", "prop"]).shape[0]
+qbs = pd.read_csv("data/qbs.csv").set_index("team")
 
 # ---- Games this week
 games = pd.read_csv("https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv")
@@ -68,8 +69,8 @@ for _, g in games.iterrows():
         "time": fmt_time(kick),
         "away": g.away_team, "home": g.home_team,
         "away_name": NAMES[g.away_team], "home_name": NAMES[g.home_team],
-        "away_qb": g.away_qb_name if pd.notna(g.away_qb_name) else "",
-        "home_qb": g.home_qb_name if pd.notna(g.home_qb_name) else "",
+        "away_qb": qbs.qb_shown.get(g.away_team, ""),
+        "home_qb": qbs.qb_shown.get(g.home_team, ""),
         "p_home": round(p_home, 3), "p_away": round(1 - p_home, 3),
         "spread_txt": spread_txt,
         "total": f"{g.total_line:g}" if pd.notna(g.total_line) else "n/a",

@@ -28,6 +28,7 @@ stats = load(f"stats_player/stats_player_week_{SEASON}.csv")
 snaps = load(f"snap_counts/snap_counts_{SEASON}.csv")
 games = load("schedules/games.csv")
 
+Path("data").mkdir(exist_ok=True)
 stats = stats[(stats.season_type == "REG") & (stats.position.isin(POSITIONS))]
 games = games[(games.season == SEASON) & (games.game_type == "REG")]
 
@@ -100,6 +101,37 @@ players = players.merge(
              "receiving_yards_factor", "receptions_factor"]],
     left_on=["next_opp", "position"], right_on=["defense", "position"], how="left",
 ).drop(columns="defense")
+
+# ---- 5) Starting QB check (schedule lists the usual starter and ignores injuries)
+qbs_all = stats[stats.position == "QB"]
+starters = qbs_all.sort_values("attempts").groupby(["team", "week"]).tail(1)
+last_qb = (starters.sort_values("week").groupby("team").tail(1)
+           .set_index("team").player_display_name.rename("last_qb"))
+main_qb = (qbs_all.groupby(["team", "player_display_name"]).attempts.sum().reset_index()
+           .sort_values("attempts").groupby("team").tail(1)
+           .set_index("team").player_display_name.rename("main_qb"))
+try:
+    inj = load(f"injuries/injuries_{SEASON}.csv")
+    inj = inj[(inj.week == next_week) & inj.report_status.isin(["Out", "Doubtful"])]
+    ruled_out = set(inj.full_name)
+except Exception:
+    ruled_out = set()
+
+qb_rows = []
+for side in ["home", "away"]:
+    for _, g in wk.iterrows():
+        team, sched = g[f"{side}_team"], g[f"{side}_qb_name"]
+        last, main = last_qb.get(team), main_qb.get(team)
+        uncertain = (sched != last) or (last != main) or (sched in ruled_out) or (last in ruled_out)
+        if sched in ruled_out or sched != last:
+            shown = f"{last}?" if last and last not in ruled_out else "QB unclear"
+        else:
+            shown = sched
+        qb_rows.append({"team": team, "sched_qb": sched, "last_qb": last, "main_qb": main,
+                        "qb_shown": shown, "qb_uncertain": bool(uncertain)})
+qbs = pd.DataFrame(qb_rows)
+qbs.to_csv("data/qbs.csv", index=False)
+print("QB situation uncertain:", ", ".join(f"{r.team} ({r.qb_shown})" for r in qbs[qbs.qb_uncertain].itertuples()) or "none")
 
 players = players.round(2).sort_values(["position", "receiving_yards_last4"], ascending=[True, False])
 players.insert(0, "week", next_week)

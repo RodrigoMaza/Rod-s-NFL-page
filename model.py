@@ -89,6 +89,8 @@ def p_over(line, mean, sd, market):
 
 
 players = pd.read_csv("data/players.csv")
+qbs = pd.read_csv("data/qbs.csv")
+qb_unsure = set(qbs[qbs.qb_uncertain].team)
 props = pd.read_csv("data/props.csv").dropna(subset=["player", "line", "odds"])
 props = props[props.market.isin(MARKETS)]
 print(f"Loaded {len(players)} players and {len(props)} prop rows")
@@ -168,6 +170,9 @@ ratio = best.proj / best.line
 ok = ((best.edge >= MIN_EDGE) & ratio.between(lo, hi) & (best.edge <= MAX_EDGE) & (best.games >= MIN_GAMES)
       & (best.role_change < ROLE_CHANGE)
       & ((best.position == "QB") | (best.snaps_last4 >= MIN_SNAPS)))
+# QB change or injury: the passing game (QB yards, all receiving) is unpredictable -> skip
+passing = best.prop.isin(["Pass yds", "Rec yds", "Receptions"])
+ok = ok & ~(passing & best.team.isin(qb_unsure))
 picks = best[ok].copy()
 # one pick per player (yards and receptions for the same player are basically the same bet)
 picks = picks.sort_values("edge", ascending=False).drop_duplicates("player")
@@ -177,7 +182,7 @@ picks.round(3).to_csv("data/picks.csv", index=False)
 
 n_raw = (best.edge >= MIN_EDGE).sum()
 print(f"\nPriced {len(best)} props. {n_raw} cleared {MIN_EDGE:.0%}; {len(picks)} kept after filters "
-      f"(games >= {MIN_GAMES}, steady role, regular snaps, projection not wildly off the line, 1 per player).\n")
+      f"(QB settled, games >= {MIN_GAMES}, steady role, regular snaps, projection not wildly off the line, 1 per player).\n")
 show = picks.head(15).copy()
 for c in ["model_p", "fair_p", "edge"]:
     show[c] = (show[c] * 100).round(0).astype(int).astype(str) + "%"
