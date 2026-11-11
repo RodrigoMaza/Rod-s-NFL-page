@@ -1,0 +1,20 @@
+name: Pull player stats
+
+on:
+  workflow_dispatch:   # manual "Run workflow" button
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Pull stats
+        run: python fetch_stats.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stats-data
+          path: data/
