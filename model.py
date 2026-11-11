@@ -14,13 +14,24 @@ How it works, per player and prop:
   5. Edge       = our probability - Vegas probability. Flag if >= MIN_EDGE.
 """
 import pandas as pd
-from scipy.stats import gamma
+from scipy.stats import gamma, poisson
 
-MIN_EDGE = 0.05          # flag only if we're 5+ percentage points above Vegas
-MAX_EDGE = 0.25          # bigger than this usually means news we don't know (injury, role change)
+MIN_EDGE = 0.04          # flag only if our (market-blended) probability beats Vegas by 4+ points
+MAX_EDGE = 0.12          # bigger than this usually means news we don't know (injury, role change)
+MODEL_WEIGHT = 0.5       # Vegas is sharp: final probability = 50% our model + 50% Vegas
+TOP_N = 10               # show at most the 10 best picks per week
+MAX_PER_TEAM = 2         # picks on the same team are usually the same bet (e.g. "offense struggles")
+MIN_LINE = {"player_pass_yds": 100, "player_rush_yds": 10,   # skip tiny lines (QB kneel-downs,
+            "player_reception_yds": 10, "player_receptions": 1.5}  # backup RBs) - math breaks there
+ROLE_CHANGE = 0.40       # skip if last-4 usage differs 40%+ from season (Vegas knows why, we don't)
+MIN_SNAPS = 0.40         # skip part-time players (non-QB) under 40% of snaps lately
+# skip if projection / line is outside this range: a gap that big means Vegas is reacting to news
+# (yardage averages run ~20% above typical games, so yards get a little more room on the high side)
+RATIO_RANGE = {"player_pass_yds": (0.75, 1.35), "player_rush_yds": (0.6, 1.7),
+               "player_reception_yds": (0.6, 1.7), "player_receptions": (0.67, 1.5)}
 RECENT_WEIGHT = 0.6      # 60% last 4 games, 40% season
 MATCHUP_WEIGHT = 0.5     # use half of the matchup effect (9 games of defense data is noisy)
-MIN_GAMES = 4
+MIN_GAMES = 6
 SD_INFLATE = 1.1         # backtest (weeks 5-9): slightly wider spread fits real outcomes better
 SHRINK = 0.5             # backtest: raw model was overconfident -> keep half its distance from 50/50
 
@@ -65,11 +76,15 @@ def payout(odds):
     return odds / 100 if odds > 0 else 100 / -odds
 
 
-def p_over(line, mean, sd):
-    """Chance of going over, using a right-skewed (gamma) curve: most games land a bit
-    below the average, with occasional big games pulling the average up."""
-    sd = sd * SD_INFLATE
-    raw = gamma.sf(line, a=(mean / sd) ** 2, scale=sd ** 2 / mean)
+def p_over(line, mean, sd, market):
+    """Chance of going over.
+    Yards: right-skewed (gamma) curve - most games land a bit below the average.
+    Receptions: whole numbers, so a Poisson count model."""
+    if market == "player_receptions":
+        raw = poisson.sf(int(line), mean)          # P(catches > line), e.g. line 4.5 -> 5+
+    else:
+        sd = sd * SD_INFLATE
+        raw = gamma.sf(line, a=(mean / sd) ** 2, scale=sd ** 2 / mean)
     return 0.5 + SHRINK * (raw - 0.5)
 
 
@@ -100,6 +115,8 @@ for _, p in players.iterrows():
             "key": None, "player_display_name": p.player_display_name, "team": p.team,
             "position": p.position, "games": p.games, "next_opp": p.next_opp,
             "market": mkt, "proj": proj, "sd": sd,
+            "snaps_last4": p.offense_pct_last4,
+            "role_change": abs(recent / season - 1) if pd.notna(recent) and season > 0 else 0,
         })
 proj = pd.DataFrame(proj_rows)
 proj["key"] = clean_name(proj.player_display_name)
@@ -124,25 +141,43 @@ if len(unmatched):
     print("  Not matched (rookies/new players or name differences):", ", ".join(sorted(unmatched)[:15]))
 
 # ---- 4) Our probability, edge and expected value
-m["p_over"] = [p_over(l, mu, s) for l, mu, s in zip(m.line, m.proj, m.sd)]
-m["model_p"] = m.p_over.where(m.side == "Over", 1 - m.p_over)
+m = m[m.line >= m.market.map(MIN_LINE)]
+m["p_over"] = [p_over(l, mu, s, mk) for l, mu, s, mk in zip(m.line, m.proj, m.sd, m.market)]
+# de-bias: on average Vegas is right, so remove any overall Over/Under lean per prop type
+over = m.side == "Over"
+lean = (m[over].p_over - m[over].fair_p).groupby(m[over].market).mean()
+m["p_over"] = m.p_over - m.market.map(lean).fillna(0)
+print("Removed model lean vs Vegas (P over):", {LABEL[k]: round(v, 3) for k, v in lean.items()})
+raw_p = m.p_over.where(over, 1 - m.p_over)
+m["model_p"] = MODEL_WEIGHT * raw_p + (1 - MODEL_WEIGHT) * m.fair_p
 m["edge"] = m.model_p - m.fair_p
 m["ev_per_100"] = 100 * (m.model_p * m.odds.apply(payout) - (1 - m.model_p))
 m["prop"] = m.market.map(LABEL)
 
 cols = ["player_display_name", "position", "team", "next_opp", "prop", "side", "line",
-        "book", "odds", "proj", "model_p", "fair_p", "edge", "ev_per_100", "games", "kickoff"]
+        "book", "odds", "proj", "model_p", "fair_p", "edge", "ev_per_100", "games",
+        "snaps_last4", "role_change", "kickoff"]
 edges = m[cols].rename(columns={"player_display_name": "player"})
 edges.round(3).to_csv("data/edges.csv", index=False)
 
 # ---- 5) Picks: best book for each player/prop/side, flagged edges only
 best = edges.sort_values("edge", ascending=False).drop_duplicates(["player", "prop", "side"])
-picks = best[(best.edge >= MIN_EDGE) & (best.games >= MIN_GAMES)].copy()
-picks["note"] = picks.edge.apply(lambda e: "check news" if e > MAX_EDGE else "")
-picks = picks.sort_values("edge", ascending=False)
+lo = best.prop.map({LABEL[k]: v[0] for k, v in RATIO_RANGE.items()})
+hi = best.prop.map({LABEL[k]: v[1] for k, v in RATIO_RANGE.items()})
+ratio = best.proj / best.line
+ok = ((best.edge >= MIN_EDGE) & ratio.between(lo, hi) & (best.edge <= MAX_EDGE) & (best.games >= MIN_GAMES)
+      & (best.role_change < ROLE_CHANGE)
+      & ((best.position == "QB") | (best.snaps_last4 >= MIN_SNAPS)))
+picks = best[ok].copy()
+# one pick per player (yards and receptions for the same player are basically the same bet)
+picks = picks.sort_values("edge", ascending=False).drop_duplicates("player")
+picks = picks.groupby("team").head(MAX_PER_TEAM).head(TOP_N)
+picks["note"] = ""
 picks.round(3).to_csv("data/picks.csv", index=False)
 
-print(f"\nPriced {len(best)} props. Flagged {len(picks)} with edge >= {MIN_EDGE:.0%}.\n")
+n_raw = (best.edge >= MIN_EDGE).sum()
+print(f"\nPriced {len(best)} props. {n_raw} cleared {MIN_EDGE:.0%}; {len(picks)} kept after filters "
+      f"(games >= {MIN_GAMES}, steady role, regular snaps, projection not wildly off the line, 1 per player).\n")
 show = picks.head(15).copy()
 for c in ["model_p", "fair_p", "edge"]:
     show[c] = (show[c] * 100).round(0).astype(int).astype(str) + "%"
