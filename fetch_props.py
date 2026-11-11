@@ -1,20 +1,22 @@
 """
-Step 1 test: pull NFL player props from The Odds API and print them.
+Pull NFL player props from The Odds API for this week's games.
 
 - Reads the API key from the ODDS_API_KEY environment variable (a GitHub secret).
-- MAX_GAMES limits how many games we pull props for (default 1, to save credits).
-- Saves results to data/props.json and data/props.csv.
+- Only pulls games that haven't started and kick off within DAYS_AHEAD days.
+- MAX_GAMES caps how many games we pull (each game costs 4 credits).
+- Saves data/props.csv (one row per book / player / market / Over-Under).
 """
 import csv
-import json
 import os
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
 
 API_KEY = os.environ.get("ODDS_API_KEY")
-MAX_GAMES = int(os.environ.get("MAX_GAMES", "1"))
+MAX_GAMES = int(os.environ.get("MAX_GAMES", "20"))
+DAYS_AHEAD = int(os.environ.get("DAYS_AHEAD", "6"))
 
 BASE = "https://api.the-odds-api.com/v4/sports/americanfootball_nfl"
 MARKETS = "player_pass_yds,player_rush_yds,player_reception_yds,player_receptions"
@@ -35,28 +37,31 @@ def get(url, params):
     return r.json()
 
 
-# 1) List upcoming games (this endpoint doesn't use credits)
-print("Fetching upcoming NFL games...")
+# 1) Upcoming games (free) -> keep only not-started games in the window
+now = datetime.now(timezone.utc)
+cutoff = now + timedelta(days=DAYS_AHEAD)
 events = get(f"{BASE}/events", {})
-print(f"Found {len(events)} upcoming games.\n")
-for e in events[:16]:
-    print(f"  {e['commence_time']}  {e['away_team']} @ {e['home_team']}")
+week_games = [
+    e for e in events
+    if now < datetime.fromisoformat(e["commence_time"].replace("Z", "+00:00")) < cutoff
+][:MAX_GAMES]
+print(f"Pulling props for {len(week_games)} games (est. {len(week_games) * 4} credits)\n")
 
-# 2) Pull props for the first MAX_GAMES games
+# 2) Props per game
 rows = []
-raw = []
-for e in events[:MAX_GAMES]:
-    print(f"\nProps for {e['away_team']} @ {e['home_team']}:")
+for e in week_games:
+    print(f"{e['away_team']} @ {e['home_team']}")
     data = get(
         f"{BASE}/events/{e['id']}/odds",
         {"regions": REGIONS, "markets": MARKETS, "oddsFormat": "american"},
     )
-    raw.append(data)
     for book in data.get("bookmakers", []):
         for market in book.get("markets", []):
             for o in market.get("outcomes", []):
                 rows.append({
-                    "game": f"{e['away_team']} @ {e['home_team']}",
+                    "game_id": e["id"],
+                    "home_team": e["home_team"],
+                    "away_team": e["away_team"],
                     "kickoff": e["commence_time"],
                     "book": book["title"],
                     "market": market["key"],
@@ -66,18 +71,12 @@ for e in events[:MAX_GAMES]:
                     "odds": o.get("price"),
                 })
 
-# 3) Save + print a sample
+# 3) Save
 Path("data").mkdir(exist_ok=True)
-Path("data/props.json").write_text(json.dumps(raw, indent=2))
-if rows:
-    with open("data/props.csv", "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=rows[0].keys())
-        w.writeheader()
-        w.writerows(rows)
-
-print(f"\nTotal prop rows: {len(rows)}")
-for r in rows[:20]:
-    print(f"  {r['book']:<14} {r['market']:<22} {str(r['player']):<24} "
-          f"{r['side']:<5} {r['line']:>6}  {r['odds']}")
-if not rows:
-    print("  No props posted yet for this game (normal early in the week).")
+fields = ["game_id", "home_team", "away_team", "kickoff", "book",
+          "market", "player", "side", "line", "odds"]
+with open("data/props.csv", "w", newline="") as f:
+    w = csv.DictWriter(f, fieldnames=fields)
+    w.writeheader()
+    w.writerows(rows)
+print(f"\nSaved {len(rows)} prop rows to data/props.csv")

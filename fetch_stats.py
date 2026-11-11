@@ -76,7 +76,13 @@ season_avg["games"] = stats.groupby(["player_id", "player_display_name", "positi
 recent = (stats.groupby("player_id").tail(RECENT_GAMES)
           .groupby("player_id")[COLS].mean().add_suffix("_last4"))
 
-players = season_avg.reset_index().merge(recent, on="player_id", how="left")
+# game-to-game spread (std dev) -> how "swingy" each player is
+SD_COLS = ["passing_yards", "rushing_yards", "receiving_yards", "receptions"]
+spread = stats.groupby("player_id")[SD_COLS].std().add_suffix("_sd")
+
+players = (season_avg.reset_index()
+           .merge(recent, on="player_id", how="left")
+           .merge(spread, on="player_id", how="left"))
 
 # keep players who are actually involved (drop deep backups)
 players = players[(players.games >= 2) & (
