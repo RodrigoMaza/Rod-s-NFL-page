@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rod's NFL Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EDF0EA;
+    --card: #F8FAF6;
+    --ink: #16233A;
+    --muted: #5B6676;
+    --rule: #C9D0C6;
+    --turf: #2D6A47;
+    --turf-dark: #1F4D33;
+    --over: #2D6A47;
+    --under: #A8382B;
+    --mark: #F3DC4B;
+    --cond: "Barlow Condensed", "Arial Narrow", sans-serif;
+    --body: "Barlow", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font: 400 16px/1.5 var(--body);
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--mark); outline-offset: 2px; }
+
+  /* ---------- Field band: the one loud thing ---------- */
+  .field {
+    position: relative; overflow: hidden; color: #fff;
+    background:
+      repeating-linear-gradient(90deg, transparent 0 79px, rgba(255,255,255,.18) 79px 81px),
+      repeating-linear-gradient(90deg, var(--turf) 0 160px, #306F4B 160px 320px);
+  }
+  .field-inner {
+    max-width: 960px; margin: 0 auto; padding: 28px 20px 26px;
+    display: flex; align-items: center; gap: 28px;
+  }
+  .yard {
+    display: flex; align-items: center; gap: 10px;
+    font: 700 clamp(104px, 22vw, 168px)/.8 var(--cond);
+    letter-spacing: -.02em; color: #F4F6F1;
+  }
+  .yard::before {
+    content: ""; width: 0; height: 0;
+    border-top: 14px solid transparent; border-bottom: 14px solid transparent;
+    border-right: 20px solid #F4F6F1; margin-right: 4px;
+  }
+  .title h1 {
+    margin: 0; font: 600 clamp(28px, 5vw, 40px)/1.05 var(--cond); letter-spacing: .005em;
+  }
+  .title p { margin: 8px 0 0; color: rgba(255,255,255,.85); font-size: 15px; }
+
+  /* ---------- Tabs ---------- */
+  .tabs {
+    position: sticky; top: 0; z-index: 5; background: var(--ink);
+  }
+  .tabs-inner { max-width: 960px; margin: 0 auto; display: flex; padding: 0 12px; }
+  .tab {
+    appearance: none; border: 0; background: none; cursor: pointer;
+    color: rgba(255,255,255,.7); font: 600 19px/1 var(--cond); letter-spacing: .02em;
+    padding: 15px 14px 13px; border-bottom: 4px solid transparent;
+  }
+  .tab[aria-selected="true"] { color: #fff; border-bottom-color: var(--mark); }
+  .tab:hover { color: #fff; }
+
+  main { max-width: 960px; margin: 0 auto; padding: 22px 20px 48px; }
+  .panel[hidden] { display: none; }
+  .lede { margin: 0 0 18px; max-width: 64ch; color: var(--muted); }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- Call sheet (props) ---------- */
+  .sheet {
+    background: var(--card); border: 2px solid var(--ink); border-radius: 6px;
+    list-style: none; margin: 0; padding: 0;
+  }
+  .call {
+    display: grid; grid-template-columns: 1.3fr 1.2fr 1.4fr; gap: 18px; align-items: center;
+    padding: 14px 16px; border-left: 8px solid var(--side);
+  }
+  .call + .call { border-top: 1px solid var(--rule); }
+  .call.over { --side: var(--over); }
+  .call.under { --side: var(--under); }
+  .who b { display: block; font-weight: 600; font-size: 17px; line-height: 1.2; }
+  .who span { color: var(--muted); font-size: 14px; }
+  .play { font: 600 24px/1.05 var(--cond); }
+  .play .side { color: var(--side); }
+  .play small { display: block; margin-top: 3px; font: 500 14px/1.3 var(--body); color: var(--muted); }
+  .odds { font-weight: 600; color: var(--ink); }
+
+  .meter { font-size: 14px; }
+  .meter-row { display: flex; justify-content: space-between; color: var(--muted); }
+  .meter-row b { color: var(--ink); font-weight: 600; }
+  .track {
+    position: relative; height: 10px; margin: 6px 0 4px; border-radius: 5px;
+    background: #DCE2D9;
+  }
+  .gap { position: absolute; top: 0; bottom: 0; background: var(--mark); border-radius: 5px; }
+  .tick {
+    position: absolute; top: -3px; width: 3px; height: 16px; border-radius: 2px;
+  }
+  .tick.vegas { background: var(--muted); }
+  .tick.us { background: var(--ink); }
+  .edge { font: 700 15px/1 var(--cond); letter-spacing: .02em; }
+
+  details.how {
+    margin: 22px 0 0; max-width: 70ch; border-top: 1px solid var(--rule); padding-top: 14px;
+  }
+  details.how summary { cursor: pointer; font-weight: 600; }
+  details.how p { margin: 8px 0; color: var(--muted); }
+
+  /* ---------- Games ---------- */
+  .games { display: grid; gap: 0; background: var(--card); border: 2px solid var(--ink); border-radius: 6px; }
+  .day {
+    font: 600 16px/1 var(--cond); letter-spacing: .03em; color: #fff; background: var(--ink);
+    padding: 8px 16px;
+  }
+  .game {
+    display: grid; grid-template-columns: 90px 1fr 150px; gap: 16px; align-items: center;
+    padding: 12px 16px;
+  }
+  .game + .game { border-top: 1px solid var(--rule); }
+  .kick { font: 600 18px/1 var(--cond); white-space: nowrap; }
+  .kick span { display: block; margin-top: 4px; font: 400 13px/1.2 var(--body); color: var(--muted); }
+  .matchup { display: flex; justify-content: space-between; font-size: 15px; }
+  .matchup b { font-weight: 600; }
+  .matchup .fav { color: var(--turf-dark); }
+  .split { display: flex; height: 10px; margin: 6px 0 4px; border-radius: 5px; overflow: hidden; }
+  .split i { display: block; }
+  .split .a { background: #9AA6B6; }
+  .split .h { background: var(--ink); }
+  .qbs { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+  .line { text-align: right; font-size: 14px; color: var(--muted); }
+  .line b { display: block; color: var(--ink); font-weight: 600; font-size: 15px; }
+
+  /* ---------- Empty state ---------- */
+  .empty {
+    background: var(--card); border: 2px dashed var(--rule); border-radius: 6px; padding: 28px 20px;
+  }
+  .empty h2 { margin: 0 0 6px; font: 600 26px/1.1 var(--cond); }
+  .empty p { margin: 0; color: var(--muted); max-width: 60ch; }
+
+  footer {
+    max-width: 960px; margin: 0 auto; padding: 0 20px 40px; color: var(--muted); font-size: 13px;
+  }
+  footer p { margin: 4px 0; max-width: 80ch; }
+
+  @media (max-width: 720px) {
+    .field-inner { gap: 16px; padding: 22px 16px 20px; }
+    .yard::before { border-top-width: 10px; border-bottom-width: 10px; border-right-width: 14px; }
+    main { padding: 18px 12px 40px; }
+    .call { grid-template-columns: 1fr; gap: 8px; padding: 14px 14px 14px 12px; }
+    .who { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .who span { text-align: right; }
+    .game { grid-template-columns: 70px 1fr; gap: 12px; }
+    .line { grid-column: 2; text-align: left; display: flex; gap: 14px; }
+    .line b { display: inline; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .gap { transition: width .4s ease; }
+  }
+</style>
+</head>
+<body>
+
+<header class="field">
+  <div class="field-inner">
+    <div class="yard" aria-hidden="true" id="yard"></div>
+    <div class="title">
+      <h1 id="title"></h1>
+      <p id="updated"></p>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs" aria-label="Sections">
+  <div class="tabs-inner" role="tablist">
+    <button class="tab" role="tab" id="t-props" aria-controls="props" aria-selected="true">Props</button>
+    <button class="tab" role="tab" id="t-games" aria-controls="games" aria-selected="false">Games</button>
+    <button class="tab" role="tab" id="t-fantasy" aria-controls="fantasy" aria-selected="false">Fantasy</button>
+  </div>
+</nav>
+
+<main>
+  <section class="panel" id="props" role="tabpanel" aria-labelledby="t-props">
+    <p class="lede" id="props-lede"></p>
+    <ol class="sheet" id="sheet"></ol>
+    <details class="how">
+      <summary>How to read this</summary>
+      <p><strong>Our chance</strong> is how often we think the player clears (or stays under) the line. <strong>Vegas</strong> is the same thing according to the odds, with the sportsbook's cut removed. The yellow gap between them is our edge.</p>
+      <p>Our numbers come from each player's recent games, his season, and how much the opponent allows to his position. We only list props where we disagree with Vegas by at least 4 points, the player has a steady role, and the gap isn't so large that it probably means injury news we don't have.</p>
+      <p>The odds shown are the best price we found and which sportsbook has it. Lines move, so check before you bet.</p>
+    </details>
+  </section>
+
+  <section class="panel" id="games" role="tabpanel" aria-labelledby="t-games" hidden>
+    <p class="lede">Every game this week with the Vegas spread, total and each team's chance to win. Times are Mexico City.</p>
+    <div class="games" id="games-list"></div>
+  </section>
+
+  <section class="panel" id="fantasy" role="tabpanel" aria-labelledby="t-fantasy" hidden>
+    <div class="empty">
+      <h2>Waiver pickups start Tuesday</h2>
+      <p>Each Tuesday morning, before waivers clear, this tab will list the best five pickups at each position and how much of your FAAB budget to bid.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>For fun with friends and family. Not betting advice. Check injury news before you bet, and only bet what you can afford to lose.</p>
+  <p>Player stats: nflverse (CC BY 4.0). Odds: The Odds API.</p>
+</footer>
+
+<script>
+const DATA = /*__DATA__*/null;
+
+const pct = x => Math.round(x * 100) + "%";
+const fmtOdds = o => (o > 0 ? "+" : "") + o;
+
+document.getElementById("yard").textContent = DATA.week;
+document.getElementById("title").textContent = `Week ${DATA.week} props and games`;
+document.getElementById("updated").textContent = `Updated ${DATA.updated}`;
+
+// ---------- Props
+const lede = document.getElementById("props-lede");
+lede.innerHTML = DATA.picks.length
+  ? `<strong>${DATA.picks.length} props</strong> where our numbers disagree with Vegas, out of ${DATA.priced} we checked. Best edge first.`
+  : `No props cleared our bar this week. We checked ${DATA.priced}, and Vegas looked right on all of them.`;
+
+const sheet = document.getElementById("sheet");
+if (!DATA.picks.length) sheet.remove();
+for (const p of DATA.picks) {
+  const side = p.side.toLowerCase();
+  const lo = Math.min(p.model_p, p.fair_p), hi = Math.max(p.model_p, p.fair_p);
+  const li = document.createElement("li");
+  li.className = `call ${side}`;
+  li.innerHTML = `
+    <div class="who"><b>${p.player}</b><span>${p.team} vs ${p.opp}, ${p.day}</span></div>
+    <div class="play"><span class="side">${p.side}</span> ${p.line} ${p.prop.toLowerCase()}
+      <small><span class="odds">${fmtOdds(p.odds)}</span> at ${p.book}. We project ${p.proj_txt}.</small></div>
+    <div class="meter" aria-label="Our chance ${pct(p.model_p)}, Vegas ${pct(p.fair_p)}">
+      <div class="meter-row"><span>Our chance <b>${pct(p.model_p)}</b></span><span>Vegas <b>${pct(p.fair_p)}</b></span></div>
+      <div class="track">
+        <div class="gap" style="left:${lo*100}%;width:${(hi-lo)*100}%"></div>
+        <div class="tick vegas" style="left:calc(${p.fair_p*100}% - 1px)"></div>
+        <div class="tick us" style="left:calc(${p.model_p*100}% - 1px)"></div>
+      </div>
+      <div class="edge">+${Math.round(p.edge*100)} point edge</div>
+    </div>`;
+  sheet.appendChild(li);
+}
+
+// ---------- Games
+const list = document.getElementById("games-list");
+let lastDay = null;
+for (const g of DATA.games) {
+  if (g.day !== lastDay) {
+    const d = document.createElement("div");
+    d.className = "day"; d.textContent = g.day_long; list.appendChild(d);
+    lastDay = g.day;
+  }
+  const favHome = g.p_home >= g.p_away;
+  const el = document.createElement("div");
+  el.className = "game";
+  el.innerHTML = `
+    <div class="kick">${g.time}<span>${g.roof}</span></div>
+    <div>
+      <div class="matchup">
+        <span class="${favHome ? "" : "fav"}"><b>${g.away_name}</b> ${pct(g.p_away)}</span>
+        <span class="${favHome ? "fav" : ""}">${pct(g.p_home)} <b>${g.home_name}</b></span>
+      </div>
+      <div class="split" role="img" aria-label="${g.away_name} ${pct(g.p_away)}, ${g.home_name} ${pct(g.p_home)}">
+        <i class="a" style="width:${g.p_away*100}%"></i><i class="h" style="width:${g.p_home*100}%"></i>
+      </div>
+      <div class="qbs"><span>${g.away_qb}</span><span>${g.home_qb}</span></div>
+    </div>
+    <div class="line"><b>${g.spread_txt}</b>Total ${g.total}</div>`;
+  list.appendChild(el);
+}
+
+// ---------- Tabs
+const tabs = [...document.querySelectorAll(".tab")];
+function show(tab) {
+  for (const t of tabs) {
+    const on = t === tab;
+    t.setAttribute("aria-selected", on);
+    document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+  }
+}
+tabs.forEach((t, i) => {
+  t.addEventListener("click", () => show(t));
+  t.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      const n = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+      n.focus(); show(n);
+    }
+  });
+});
+</script>
+</body>
+</html>
