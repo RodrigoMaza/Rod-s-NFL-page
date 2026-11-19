@@ -1,0 +1,11 @@
+player,position,team,next_opp,prop,side,line,book,odds,proj,model_p,fair_p,edge,ev_per_100,games,snaps_last4,role_change,kickoff,note
+Devaughn Vele,WR,NO,CHI,Receptions,Over,2.5,BetOnline.ag,128,3.134,0.48,0.412,0.068,9.502,9.0,0.9,0.27,2026-11-22T18:00:00Z,
+Nico Collins,WR,HOU,IND,Rec yds,Under,62.5,Bovada,135,61.974,0.463,0.398,0.065,8.856,7.0,0.74,0.162,2026-11-20T01:15:00Z,
+Tyler Warren,TE,IND,HOU,Rec yds,Under,28.5,Bovada,160,34.808,0.425,0.36,0.064,10.474,8.0,0.84,0.058,2026-11-20T01:15:00Z,
+Laquon Treadwell,WR,IND,HOU,Receptions,Under,2.5,BetMGM,-115,1.735,0.564,0.5,0.064,5.513,10.0,0.78,0.211,2026-11-20T01:15:00Z,
+C.J. Stroud,QB,HOU,IND,Pass yds,Over,289.5,Bovada,170,268.424,0.407,0.347,0.06,9.781,9.0,0.97,0.031,2026-11-20T01:15:00Z,
+Justin Herbert,QB,LAC,NYJ,Pass yds,Under,173.5,Bovada,185,184.199,0.388,0.329,0.059,10.672,9.0,0.95,0.024,2026-11-22T21:05:00Z,
+George Pickens,WR,DAL,TEN,Receptions,Over,5.5,FanDuel,110,6.525,0.504,0.445,0.059,5.813,9.0,0.74,0.034,2026-11-22T18:00:00Z,
+Chase Brown,RB,CIN,WAS,Receptions,Over,4.5,FanDuel,102,5.649,0.52,0.462,0.058,5.036,9.0,0.7,0.102,2026-11-24T01:15:00Z,
+Evan Engram,TE,DEN,LV,Rec yds,Under,20.5,BetRivers,-115,14.491,0.548,0.491,0.058,2.479,9.0,0.48,0.361,2026-11-22T21:25:00Z,
+Geno Smith,QB,NYJ,LAC,Pass yds,Over,250.5,Bovada,175,226.991,0.396,0.34,0.056,8.97,10.0,0.87,0.0,2026-11-22T21:05:00Z,
