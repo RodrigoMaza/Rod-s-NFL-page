@@ -1,0 +1,11 @@
+player,position,team,next_opp,prop,side,line,book,odds,proj,model_p,fair_p,edge,ev_per_100,games,snaps_last4,role_change,kickoff,note
+Saquon Barkley,RB,PHI,DAL,Rush yds,Under,46.5,Bovada,275,52.296,0.367,0.25,0.117,37.715,8.0,0.43,0.019,2026-11-26T21:30:00Z,
+Patrick Mahomes,QB,KC,BUF,Pass yds,Over,264.5,Bovada,170,298.014,0.463,0.347,0.116,24.884,10.0,0.94,0.14,2026-11-27T01:20:00Z,
+Amon-Ra St. Brown,WR,DET,CHI,Rec yds,Under,63.5,Bovada,200,72.806,0.41,0.312,0.098,23.055,10.0,0.73,0.157,2026-11-26T18:00:00Z,
+Jared Goff,QB,DET,CHI,Pass yds,Under,251.5,Bovada,180,247.84,0.423,0.335,0.088,18.378,10.0,0.96,0.146,2026-11-26T18:00:00Z,
+Javonte Williams,RB,DAL,PHI,Rush yds,Under,57.5,Bovada,245,74.536,0.354,0.271,0.082,22.013,11.0,0.7,0.04,2026-11-26T21:30:00Z,
+Josh Allen,QB,BUF,KC,Pass yds,Over,248.5,Bovada,175,246.894,0.418,0.34,0.078,15.044,10.0,0.96,0.012,2026-11-27T01:20:00Z,
+Ted Hurst III,WR,TB,CAR,Receptions,Under,1.5,FanDuel,148,1.55,0.455,0.377,0.078,12.881,9.0,0.41,0.298,2026-12-01T01:15:00Z,
+Dak Prescott,QB,DAL,PHI,Pass yds,Over,293.5,Bovada,170,293.478,0.424,0.347,0.077,14.508,11.0,1.0,0.081,2026-11-26T21:30:00Z,
+Denzel Boston,WR,CLE,LV,Receptions,Over,2.5,FanDuel,120,3.497,0.501,0.425,0.076,10.146,10.0,0.87,0.212,2026-11-30T01:20:00Z,
+Xavier Worthy,WR,KC,BUF,Receptions,Over,2.5,BetOnline.ag,149,3.02,0.453,0.378,0.075,12.713,10.0,0.8,0.214,2026-11-27T01:20:00Z,
